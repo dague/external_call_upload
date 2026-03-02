@@ -121,8 +121,13 @@ components:
       properties:
         operator_phone:
           type: string
+          description: |
+            Идентификатор оператора (телефон в проектном формате или внутренний
+            добавочный номер, например "1400").
         client_phone:
           type: string
+          description: |
+            Телефон клиента в проектном телефонном формате.
         start_time:
           type: string
           format: date-time
