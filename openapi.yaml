@@ -1,0 +1,240 @@
+openapi: 3.1.0
+info:
+  title: External Call Upload API
+  version: 1.0.0
+  description: |
+    API для двухшаговой загрузки записей звонков от внешних систем.
+servers:
+  - url: /
+paths:
+  /api/v1/integrations/calls/upload-init:
+    put:
+      summary: Инициализация загрузки звонка
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UploadInitRequest'
+      responses:
+        '200':
+          description: Ссылка для временной загрузки получена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UploadInitResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/integrations/calls/upload/{upload_id}:
+    put:
+      summary: Загрузка бинарного файла по signed URL
+      parameters:
+        - name: upload_id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: sig
+          in: query
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          audio/mpeg:
+            schema:
+              type: string
+              format: binary
+          application/octet-stream:
+            schema:
+              type: string
+              format: binary
+      responses:
+        '200':
+          description: Файл загружен
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BinaryUploadResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '403':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+        '410':
+          $ref: '#/components/responses/ErrorResponse'
+        '413':
+          $ref: '#/components/responses/ErrorResponse'
+        '500':
+          $ref: '#/components/responses/ErrorResponse'
+  /api/v1/integrations/calls/finalize:
+    put:
+      summary: Финализация загрузки и создание диалога
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FinalizeRequest'
+      responses:
+        '200':
+          description: Финализация выполнена
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FinalizeResponse'
+        '400':
+          $ref: '#/components/responses/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/ErrorResponse'
+        '409':
+          $ref: '#/components/responses/ErrorResponse'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+  responses:
+    ErrorResponse:
+      description: Ошибка
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    UploadMetadata:
+      type: object
+      required: [operator_phone, client_phone, start_time, call_type]
+      properties:
+        operator_phone:
+          type: string
+        client_phone:
+          type: string
+        start_time:
+          type: string
+          format: date-time
+        call_type:
+          type: string
+          enum: [in, out]
+    UploadInitRequest:
+      type: object
+      required: [external_call_id, file_name, file_size, content_type, metadata]
+      properties:
+        external_call_id:
+          type: string
+        file_name:
+          type: string
+        file_size:
+          type: integer
+          minimum: 1
+          maximum: 104857600
+        content_type:
+          type: string
+        sha256:
+          type: string
+        metadata:
+          $ref: '#/components/schemas/UploadMetadata'
+    UploadInitResponse:
+      type: object
+      properties:
+        upload_id:
+          type: string
+          format: uuid
+        already_finalized:
+          type: boolean
+          description: |
+            Если true, загрузка ранее уже была финализирована для этого
+            source_system + external_call_id.
+        status:
+          type: string
+          enum: [finalized, duplicate, filtered]
+        dialog_id:
+          type: integer
+          nullable: true
+        upload_url:
+          type: string
+        upload_method:
+          type: string
+          enum: [PUT]
+        upload_headers:
+          type: object
+          additionalProperties:
+            type: string
+        expires_at:
+          type: string
+          format: date-time
+        max_file_size:
+          type: integer
+        request_id:
+          type: string
+    BinaryUploadResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [uploaded]
+        upload_id:
+          type: string
+          format: uuid
+        bytes_received:
+          type: integer
+        sha256:
+          type: string
+        request_id:
+          type: string
+    FinalizeRequest:
+      type: object
+      required: [upload_id, external_call_id]
+      properties:
+        upload_id:
+          type: string
+          format: uuid
+        external_call_id:
+          type: string
+        etag:
+          type: string
+    FinalizeResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [created, duplicate, filtered, fault]
+        dialog_id:
+          type: integer
+          nullable: true
+        dedup:
+          type: boolean
+        upload_id:
+          type: string
+          format: uuid
+        error_code:
+          type: string
+        message:
+          type: string
+        request_id:
+          type: string
+    ErrorResponse:
+      type: object
+      required: [error_code, message, retryable, request_id]
+      properties:
+        error_code:
+          type: string
+        message:
+          type: string
+        retryable:
+          type: boolean
+        request_id:
+          type: string
