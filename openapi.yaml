@@ -165,7 +165,7 @@ components:
             source_system + external_call_id.
         status:
           type: string
-          enum: [finalized, duplicate, filtered]
+          enum: [accepted, filtered]
         dialog_id:
           type: integer
           nullable: true
@@ -216,12 +216,10 @@ components:
       properties:
         status:
           type: string
-          enum: [created, duplicate, filtered, fault]
+          enum: [accepted, filtered, fault]
         dialog_id:
           type: integer
           nullable: true
-        dedup:
-          type: boolean
         upload_id:
           type: string
           format: uuid
@@ -233,8 +231,11 @@ components:
           type: string
     ErrorResponse:
       type: object
-      required: [error_code, message, retryable, request_id]
+      required: [status, error_code, message, retryable, request_id]
       properties:
+        status:
+          type: string
+          enum: [error]
         error_code:
           type: string
         message:
